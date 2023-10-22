@@ -39,7 +39,7 @@ ENDM
 .STACK 100h
 
 .DATA
-    NAME_LENGTH     EQU 50
+    NAME_LENGTH     EQU 30
     nomes           DB  NAME_LENGTH DUP (?), '$'
                     DB  NAME_LENGTH DUP (?), '$'
                     DB  NAME_LENGTH DUP (?), '$'
@@ -107,7 +107,7 @@ sair:
     INT 21h
 ENDP
 
-print_menu PROC NEAR    ;print opcoes do menu
+print_menu PROC NEAR    ;print opcoes do menu                               PRONTO
     PUSH AX
 
     nl  ;enter
@@ -130,11 +130,90 @@ print_menu PROC NEAR    ;print opcoes do menu
 ENDP
 
 print_tabela PROC NEAR  ;print nome, notas e media dos alunos
+    PUSH AX
 
+    XOR DI, DI              ;endereço nomes
+    MOV AH, 02h
+    MOV CX, 30              ;contador caracteres p/ nome
+loop_print_nome1:
+    MOV DL, nomes[DI]
+    INT 21h
+    INC DI
+    LOOP loop_print_nome1
+
+
+    XOR AX, AX
+    XOR BX, BX
+    MOV SI, 10
+    XOR CX, CX
+
+    MOV AL, notas[BX]
+loop_empilha_nota1:
+    XOR DX, DX
+
+    DIV SI
+    PUSH DX
+    INC CX
+    CMP AX, 0
+    JNE loop_empilha_nota1
+
+    space
+    MOV AH, 02h
+loop_print_nota1:
+    POP DX
+    OR DX, 30h
+    INT 21h
+    LOOP loop_print_nota1
+
+    XOR AX, AX
+    INC BX
+    MOV AL, notas[BX]
+loop_empilha_nota2:
+    XOR DX, DX
+
+    DIV SI
+    PUSH DX
+    INC CX
+    CMP AX, 0
+    JNE loop_empilha_nota2
+
+    space
+    MOV AH, 02h
+loop_print_nota2:
+    POP DX
+    OR DX, 30h
+    INT 21h
+    LOOP loop_print_nota2
+
+    XOR AX, AX
+    INC BX
+    MOV AL, notas[BX]
+ loop_empilha_nota3:
+    XOR DX, DX
+
+    DIV SI
+    PUSH DX
+    INC CX
+    CMP AX, 0
+    JNE loop_empilha_nota2
+
+    space
+    MOV AH, 02h
+loop_print_nota3:
+    POP DX
+    OR DX, 30h
+    INT 21h
+    LOOP loop_print_nota3
+
+    ;SE ULTIMA NOTA É 10 ESTA PRINTANDO UM SPACE + '0'
+
+    nl
+    input
+    POP AX
     RET
 ENDP
 
-inserir_dados PROC NEAR ;insere nome e notas dos alunos NAO LE 2 NUMEROS - 10
+inserir_dados PROC NEAR ;insere nome e notas dos alunos                     PRONTO
     PUSH AX
     XOR AX, AX
     XOR BX, BX
@@ -155,10 +234,9 @@ inserir_dados PROC NEAR ;insere nome e notas dos alunos NAO LE 2 NUMEROS - 10
     JMP sair_inserir_dados
 
 dados_n_cheios:         ;ainda nao tem 5 alunos
-    XOR AH, AH
     MOV DI, AX          ;alunos ja cadastrados
     MOV SI, AX          ;coluna
-    MOV CX, 50          ;tamanho das string
+    MOV CX, 30          ;tamanho das string
     MUL CX              ;linha do aluno a ser cadastrado
     
     MOV AH, 09h
@@ -185,33 +263,104 @@ terminou_nome:
     MOV AH, 09h
     MOV DX, OFFSET pede_p1      ;print pedindo p1
     INT 21h
-  
-    MOV AH, 01h  
-    INT 21h
-    MOV notas[DI], AL           ;le nota p2
-    INC DI
 
-    nl  ;enter
+    XOR CX, CX                  ;contador de numeros inseridos
+    MOV BX, 10
+le_p1:                          ;le p1
+    MOV AH, 01h
+    INT 21h
+    CMP AL, 13                  ;cmp enter
+    JE sair_p1
+
+    AND AL, 0Fh
+
+    CMP CX, 0
+    JNE pilha_p1                ;nao é primeiro digito
+
+    XOR AH, AH
+    PUSH AX 
+    INC CX
+    JMP le_p1
+
+pilha_p1:
+    MOV DL, AL                  ;guarda AL
+    POP AX                      ;pega primeiro digito
+    MUL BX                      ;primeiro digito x10
+    ADD AL, DL                  ;primeiro_d x10 + segundo digito
+    PUSH AX                     ;salva numero
+    JMP le_p1
+
+sair_p1:                        ;digitou enter
+    POP AX
+    MOV notas[DI], AL           ;guarda nota p1
+    INC DI                      ;endereco pra p2
 
     MOV AH, 09h
     MOV DX, OFFSET pede_p2      ;print pedindo p2
     INT 21h
 
-    MOV AH, 01h  
+    XOR CX, CX                  ;contador
+le_p2:                          ;le p2
+    MOV AH, 01h
     INT 21h
-    MOV notas[DI], AL           ;le nota p2
-    INC DI
+    CMP AL, 13
+    JE sair_p2
 
-    nl  ;enter
+    AND AL, 0Fh
+
+    CMP CX, 0                   ;ve se eh primeiro digito
+    JNE pilha_p2
+
+    XOR AH, AH
+    PUSH AX 
+    INC CX
+    JMP le_p2
+
+pilha_p2:                       ;primeiro_d x 10 + segundo digito
+    MOV DL, AL
+    POP AX
+    MUL BX
+    ADD AL, DL
+    PUSH AX                     ;guarda numero na pilha
+    JMP le_p2
+sair_p2:
+    POP AX
+    MOV notas[DI], AL           ;salva nota p2
+    INC DI
 
     MOV AH, 09h
     MOV DX, OFFSET pede_p3      ;print pedindo p3
     INT 21h
 
-    MOV AH, 01h  
+    XOR CX, CX                  ;contador
+le_p3:                          ;le p3
+    MOV AH, 01h
     INT 21h
-    MOV notas[DI], AL           ;le nota p3
- 
+    CMP AL, 13
+    JE sair_p3
+
+    AND AL, 0Fh
+
+    CMP CX, 0
+    JNE pilha_p3
+
+    XOR AH, AH
+    PUSH AX 
+    INC CX
+    JMP le_p3
+
+pilha_p3:                       ;primeiro_d x 10 + segundo digito
+    MOV DL, AL
+    POP AX
+    MUL BX
+    ADD AL, DL
+    PUSH AX                     ;guarda nota na pilha
+    JMP le_p3
+sair_p3:                        ;digitou enter
+    POP AX
+    MOV notas[DI], AL           ;salva nota p3
+    INC DI
+
     nl  ;enter
 
     MOV AH, 09h
@@ -234,7 +383,16 @@ sair_inserir_dados:
 ENDP
 
 mudar_dados PROC NEAR   ;muda nota de 1 aluno
-    
+    PUSH AX
+
+    POP AX
+    RET
+ENDP
+
+calcula_media PROC NEAR ;calcula media do aluno pra função print_tabela
+    PUSH AX
+
+    POP AX
     RET
 ENDP
 END MAIN
