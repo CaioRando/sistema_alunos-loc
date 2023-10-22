@@ -134,9 +134,10 @@ print_tabela PROC NEAR  ;print nome, notas e media dos alunos
     RET
 ENDP
 
-inserir_dados PROC NEAR ;insere nome e notas dos alunos
+inserir_dados PROC NEAR ;insere nome e notas dos alunos NAO LE 2 NUMEROS - 10
     PUSH AX
     XOR AX, AX
+    XOR BX, BX
 
     MOV AL, cadastros   ;checa se tem 5 alunos cadastrados
     CMP AL, 5
@@ -156,9 +157,9 @@ inserir_dados PROC NEAR ;insere nome e notas dos alunos
 dados_n_cheios:         ;ainda nao tem 5 alunos
     XOR AH, AH
     MOV DI, AX          ;alunos ja cadastrados
+    MOV SI, AX          ;coluna
     MOV CX, 50          ;tamanho das string
     MUL CX              ;linha do aluno a ser cadastrado
-    MOV SI, AX          ;coluna
     
     MOV AH, 09h
     MOV DX, OFFSET pede_nome    ;print pedindo nome
@@ -184,10 +185,10 @@ terminou_nome:
     MOV AH, 09h
     MOV DX, OFFSET pede_p1      ;print pedindo p1
     INT 21h
-
-    MOV AH, 01h                 
+  
+    MOV AH, 01h  
     INT 21h
-    MOV notas[DI], AL        ;le nota p1
+    MOV notas[DI], AL           ;le nota p2
     INC DI
 
     nl  ;enter
@@ -198,7 +199,7 @@ terminou_nome:
 
     MOV AH, 01h  
     INT 21h
-    MOV notas[DI], AL        ;le nota p2
+    MOV notas[DI], AL           ;le nota p2
     INC DI
 
     nl  ;enter
@@ -209,7 +210,7 @@ terminou_nome:
 
     MOV AH, 01h  
     INT 21h
-    MOV notas[DI], AL        ;le nota p3
+    MOV notas[DI], AL           ;le nota p3
  
     nl  ;enter
 
