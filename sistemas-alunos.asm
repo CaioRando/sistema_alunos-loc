@@ -133,81 +133,96 @@ print_tabela PROC NEAR  ;print nome, notas e media dos alunos
     PUSH AX
 
     XOR DI, DI              ;endereço nomes
-    MOV AH, 02h
-    MOV CX, 30              ;contador caracteres p/ nome
-loop_print_nome1:
-    MOV DL, nomes[DI]
-    INT 21h
-    INC DI
-    LOOP loop_print_nome1
-
-
-    XOR AX, AX
-    XOR BX, BX
-    MOV SI, 10
+    XOR BX, BX              ;endereço notas
     XOR CX, CX
 
-    MOV AL, notas[BX]
-loop_empilha_nota1:
-    XOR DX, DX
+    MOV CL, cadastros
+loop_todos_alunos:
+    PUSH CX                 ;guarda contador de quantos alunos tem que imprimir
+    MOV AH, 02h
+    MOV CL, 30              ;contador caracteres p/ nome
+    loop_print_nome:
+        MOV DL, nomes[DI]
+        INT 21h
+        INC DI
+        DEC CL
+        JNZ loop_print_nome
 
-    DIV SI
-    PUSH DX
-    INC CX
-    CMP AX, 0
-    JNE loop_empilha_nota1
+
+    XOR AX, AX
+    XOR CX, CX
+
+    MOV BP, 10
+
+    MOV AL, notas[BX]
+    loop_empilha_nota1:
+        XOR DX, DX
+
+        DIV BP
+        PUSH DX
+        INC CL
+        CMP AX, 0
+        JNE loop_empilha_nota1
 
     space
     MOV AH, 02h
-loop_print_nota1:
-    POP DX
-    OR DX, 30h
-    INT 21h
-    LOOP loop_print_nota1
+    loop_print_nota1:
+        POP DX
+        OR DX, 30h
+        INT 21h
+        DEC CL
+        JNZ loop_print_nota1
 
     XOR AX, AX
     INC BX
     MOV AL, notas[BX]
-loop_empilha_nota2:
-    XOR DX, DX
+    loop_empilha_nota2:
+        XOR DX, DX
 
-    DIV SI
-    PUSH DX
-    INC CX
-    CMP AX, 0
-    JNE loop_empilha_nota2
+        DIV BP
+        PUSH DX
+        INC CL
+        CMP AX, 0
+        JNE loop_empilha_nota2
 
     space
     MOV AH, 02h
-loop_print_nota2:
-    POP DX
-    OR DX, 30h
-    INT 21h
-    LOOP loop_print_nota2
+    loop_print_nota2:
+        POP DX
+        OR DX, 30h
+        INT 21h
+        DEC CL
+        JNZ loop_print_nota2
 
     XOR AX, AX
     INC BX
     MOV AL, notas[BX]
- loop_empilha_nota3:
-    XOR DX, DX
+    loop_empilha_nota3:
+        XOR DX, DX
 
-    DIV SI
-    PUSH DX
-    INC CX
-    CMP AX, 0
-    JNE loop_empilha_nota2
+        DIV BP
+        PUSH DX
+        INC CL
+        CMP AX, 0
+        JNE loop_empilha_nota3
 
     space
     MOV AH, 02h
-loop_print_nota3:
-    POP DX
-    OR DX, 30h
-    INT 21h
-    LOOP loop_print_nota3
-
-    ;SE ULTIMA NOTA É 10 ESTA PRINTANDO UM SPACE + '0'
-
+    loop_print_nota3:
+        POP DX
+        OR DX, 30h
+        INT 21h
+        DEC CL
+        JNZ loop_print_nota3
     nl
+
+    INC BX
+    POP CX
+    DEC CX
+    JZ sair_tabela
+    JMP loop_todos_alunos
+
+sair_tabela:
     input
     POP AX
     RET
@@ -234,10 +249,12 @@ inserir_dados PROC NEAR ;insere nome e notas dos alunos                     PRON
     JMP sair_inserir_dados
 
 dados_n_cheios:         ;ainda nao tem 5 alunos
-    MOV DI, AX          ;alunos ja cadastrados
-    MOV SI, AX          ;coluna
+
+    MOV DI, AX
+    XOR SI, SI          ;coluna
     MOV CX, 30          ;tamanho das string
-    MUL CX              ;linha do aluno a ser cadastrado
+    MUL CX
+    MOV BX, AX          ;linha do aluno a ser cadastrado
     
     MOV AH, 09h
     MOV DX, OFFSET pede_nome    ;print pedindo nome
@@ -249,7 +266,7 @@ escrever_nome:
 
     CMP AL, 13
     JE terminou_nome             ;enter
-    MOV nomes[SI], AL
+    MOV nomes[BX+SI], AL
     INC SI
     JMP escrever_nome
 
