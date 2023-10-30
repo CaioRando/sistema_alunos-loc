@@ -15,7 +15,8 @@
 
 .MODEL SMALL
 
-nl  MACRO   ;print new line
+nl  MACRO   ;print 'enter'
+    PUSH AX
     MOV AH, 02
 
     MOV DL, 10
@@ -23,17 +24,22 @@ nl  MACRO   ;print new line
 
     MOV DL, 13
     INT 21h
+    POP AX
 ENDM
 
-space MACRO ;print space
+space MACRO ;print 'space'
+    PUSH AX
     MOV AH, 02
     MOV DL, 32
     INT 21h
+    POP AX
 ENDM
 
 input MACRO ;espera input do user
+    PUSH AX
     MOV AH, 08h
     INT 21h
+    POP AX
 ENDM
 
 .STACK 100h
@@ -54,20 +60,23 @@ ENDM
 
     medias          DB  5 DUP (?)
 
-    menu_tabela     DB  "1. Ver tabela", 10, 13, '$'
-    menu_aluno      DB  "2. Inserir aluno", 10, 13, '$'
-    menu_corrigir   DB  "3. Corrigir notas", 10, 13, '$'
-    menu_sair       DB  "0. Sair", 10, 13, '$'
+    cadastros       DB  0
+
+    menu_geral      DB  "1. Ver tabela", 10, 13
+                    DB  "2. Inserir aluno", 10, 13
+                    DB  "3. Corrigir notas", 10, 13
+                    DB  "0. Sair", 10, 13, '$'
 
     pede_enter      DB  "Pressione <enter>$"
 
-    pede_nome       DB  "Digite o nome do aluno $"
+    pede_nome       DB  "Digite o nome do aluno: $"
     pede_p1         DB  "Digite a nota da P1: $"
     pede_p2         DB  "Digite a nota da P2: $"
     pede_p3         DB  "Digite a nota da P3: $"
-    cadastros       DB  0
+
     cadastro_max    DB  "Ja possui 5 alunos cadastrados$"
     cadastro_ok     DB  "Cadastro realizado com sucesso!$"
+    cadastro_vazio  DB  "Nenhum aluno cadastrado$"
 
 
 .CODE
@@ -81,6 +90,7 @@ menu:
     INT 21h     ;le input user
     AND AL, 0Fh ;decimal
 
+    nl
     CMP AL, 1
     JE tabela   ;1. tabela
     JB sair     ;0. sair
@@ -113,16 +123,7 @@ print_menu PROC NEAR    ;print opcoes do menu                               PRON
     nl  ;enter
 
     MOV AH, 09h
-    MOV DX, OFFSET menu_tabela
-    INT 21h
-
-    MOV DX, OFFSET menu_aluno
-    INT 21h
-
-    MOV DX, OFFSET menu_corrigir
-    INT 21h
-
-    MOV DX, OFFSET menu_sair
+    MOV DX, OFFSET menu_geral
     INT 21h
 
     POP AX
@@ -132,6 +133,12 @@ ENDP
 print_tabela PROC NEAR  ;print nome, notas e media dos alunos
     PUSH AX
 
+    MOV CL, cadastros
+    OR CL, CL
+    JNZ tem_cadastro
+    JMP nenhum_cadastro
+
+tem_cadastro:
     XOR DI, DI              ;endereço nomes
     XOR BX, BX              ;endereço notas
     XOR CX, CX
@@ -222,8 +229,18 @@ loop_todos_alunos:
     JZ sair_tabela
     JMP loop_todos_alunos
 
+nenhum_cadastro:
+    MOV AH, 09h
+    MOV DX, OFFSET cadastro_vazio
+    INT 21h
+
 sair_tabela:
+    nl
+    MOV AH, 09h
+    MOV DX, OFFSET pede_enter
+    INT 21h
     input
+    nl
     POP AX
     RET
 ENDP
@@ -244,8 +261,8 @@ inserir_dados PROC NEAR ;insere nome e notas dos alunos                     PRON
     nl
     MOV DX, OFFSET pede_enter
     INT 21h
-    input
     nl
+    input
     JMP sair_inserir_dados
 
 dados_n_cheios:         ;ainda nao tem 5 alunos
@@ -406,8 +423,39 @@ mudar_dados PROC NEAR   ;muda nota de 1 aluno
     RET
 ENDP
 
-calcula_media PROC NEAR ;calcula media do aluno pra função print_tabela
+calcula_media PROC NEAR ;calcula media dos alunos para função print_tabela  PONTO FLUTUANTE??????
     PUSH AX
+
+    XOR SI, SI  ;linha matriz das notas
+    XOR BX, BX  ;coluna matriz das notas
+
+    XOR AX, AX
+    MOV CL, cadastros   ;contador quantidade de cadastros
+    MOV CH, 3   ;contador de notas p/ aluno
+soma_media:
+    MOV AH, notas[SI][BX]
+    ADD AL, AH  ;soma
+    INC BX      ;prox coluna
+    DEC CH
+    JNZ soma_media
+
+    XOR AH, AH 
+    PUSH AX     ;salva soma das notas (invertida)
+    ADD SI, 3   ;prox linha
+    XOR BX, BX  ;coluna 0
+    MOV CH, 3   ;contador de notas p/ aluno
+    DEC CL      ;-1 aluno
+    JNZ soma_media
+
+    MOV CX, cadastros
+    MOV SI, CX  ;espaco do array de medias
+    DEC SI      ;final do array
+    MOV BX, 3
+divide_media:
+    XOR DX, DX
+    POP AX
+    DIV BX
+
 
     POP AX
     RET
