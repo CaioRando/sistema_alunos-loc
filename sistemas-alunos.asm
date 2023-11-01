@@ -17,6 +17,8 @@
 
 new_line  MACRO   ;print 'enter'
     PUSH AX
+    PUSH DX
+
     MOV AH, 02
 
     MOV DL, 10
@@ -24,14 +26,20 @@ new_line  MACRO   ;print 'enter'
 
     MOV DL, 13
     INT 21h
+    
+    POP DX
     POP AX
 ENDM
 
 space MACRO ;print 'space'
     PUSH AX
+    PUSH DX
+
     MOV AH, 02
     MOV DL, 9
     INT 21h
+
+    POP DX
     POP AX
 ENDM
 
@@ -142,8 +150,8 @@ tem_cadastro:
     CALL calcula_media
 
     XOR DI, DI              ;endereço nomes
-    XOR BX, BX              ;endereço notas
     XOR CX, CX
+    XOR SI, SI              ;endereço medias
 
     MOV CL, cadastros
 loop_todos_alunos:
@@ -160,73 +168,20 @@ loop_todos_alunos:
         JNZ loop_print_nome
 
 
-    XOR AX, AX
-    XOR CX, CX
-
-    MOV SI, 10
-
-    MOV AL, notas[BX]
-    loop_empilha_nota1:
-        XOR DX, DX
-
-        DIV SI
-        PUSH DX
-        INC CL
-        CMP AX, 0
-        JNE loop_empilha_nota1
+    XOR BX, BX              ;endereço notas
+    MOV CX, 3               ;3 notas
 
     space
-    MOV AH, 02h
-    loop_print_nota1:
-        POP DX
-        OR DX, 30h
-        INT 21h
-        DEC CL
-        JNZ loop_print_nota1
-
+printa_notas:
     XOR AX, AX
+    MOV AL, notas[BX]       ;nota em AX
+
+    CALL print_decimal
+
+    space
     INC BX
-    MOV AL, notas[BX]
-    loop_empilha_nota2:
-        XOR DX, DX
-
-        DIV SI
-        PUSH DX
-        INC CL
-        CMP AX, 0
-        JNE loop_empilha_nota2
-
-    space
-    MOV AH, 02h
-    loop_print_nota2:
-        POP DX
-        OR DX, 30h
-        INT 21h
-        DEC CL
-        JNZ loop_print_nota2
-
-    XOR AX, AX
-    INC BX
-    MOV AL, notas[BX]
-    loop_empilha_nota3:
-        XOR DX, DX
-
-        DIV SI
-        PUSH DX
-        INC CL
-        CMP AX, 0
-        JNE loop_empilha_nota3
-
-    space
-    MOV AH, 02h
-    loop_print_nota3:
-        POP DX
-        OR DX, 30h
-        INT 21h
-        DEC CL
-        JNZ loop_print_nota3
-
-    space
+    LOOP printa_notas
+  
 
     POP SI
     MOV AH, 02h
@@ -479,4 +434,32 @@ divide_media:
     RET
 ENDP
 
+print_decimal PROC NEAR ;printa decimais (numero em AX)
+    PUSH BX
+    PUSH CX
+    PUSH DX
+
+    XOR CX, CX
+    MOV BX, 10
+
+empilha_dec:
+    XOR DX, DX
+    DIV BX
+    PUSH DX
+    INC CX
+    CMP AX, 0
+    JNZ empilha_dec
+
+    MOV AH, 02h
+desempilha_dec:
+    POP DX
+    OR DL, 30h
+    INT 21h
+    LOOP desempilha_dec
+
+    POP DX
+    POP CX
+    POP BX
+    RET
+ENDP
 END MAIN
