@@ -11,11 +11,11 @@
 
 ;INTEGRANTES:
 ;CAIO NICOLAS MAROSTICA RANDO   RA: 23010691
-;MATHEUS PITHON...
+;MATHEUS PITHON YAMAUCHI        RA: 23005808
 
 .MODEL SMALL
 
-nl  MACRO   ;print 'enter'
+new_line  MACRO   ;print 'enter'
     PUSH AX
     MOV AH, 02
 
@@ -30,7 +30,7 @@ ENDM
 space MACRO ;print 'space'
     PUSH AX
     MOV AH, 02
-    MOV DL, 32
+    MOV DL, 9
     INT 21h
     POP AX
 ENDM
@@ -46,19 +46,19 @@ ENDM
 
 .DATA
     NAME_LENGTH     EQU 30
-    nomes           DB  NAME_LENGTH DUP (?), '$'
+    nomes           DB  NAME_LENGTH DUP (?), '$'        ;Matriz para os 5 nomes
                     DB  NAME_LENGTH DUP (?), '$'
                     DB  NAME_LENGTH DUP (?), '$'
                     DB  NAME_LENGTH DUP (?), '$'
                     DB  NAME_LENGTH DUP (?), '$'
 
-    notas           DB  3 DUP (?)
+    notas           DB  3 DUP (?)                       ;Matriz 3 notas por aluno
                     DB  3 DUP (?)
                     DB  3 DUP (?)
                     DB  3 DUP (?)
                     DB  3 DUP (?)
 
-    medias          DB  5 DUP (?)
+    medias          DB  5 DUP (?)                       ;Array para as 5 medias
 
     cadastros       DB  0
 
@@ -90,7 +90,7 @@ menu:
     INT 21h     ;le input user
     AND AL, 0Fh ;decimal
 
-    nl
+    new_line
     CMP AL, 1
     JE tabela   ;1. tabela
     JB sair     ;0. sair
@@ -120,7 +120,7 @@ ENDP
 print_menu PROC NEAR    ;print opcoes do menu                               PRONTO
     PUSH AX
 
-    nl  ;enter
+    new_line  ;enter
 
     MOV AH, 09h
     MOV DX, OFFSET menu_geral
@@ -139,6 +139,8 @@ print_tabela PROC NEAR  ;print nome, notas e media dos alunos
     JMP nenhum_cadastro
 
 tem_cadastro:
+    CALL calcula_media
+
     XOR DI, DI              ;endereço nomes
     XOR BX, BX              ;endereço notas
     XOR CX, CX
@@ -146,8 +148,10 @@ tem_cadastro:
     MOV CL, cadastros
 loop_todos_alunos:
     PUSH CX                 ;guarda contador de quantos alunos tem que imprimir
+    PUSH SI                 ;prox media
+
     MOV AH, 02h
-    MOV CL, 30              ;contador caracteres p/ nome
+    MOV CL, NAME_LENGTH              ;contador caracteres p/ nome
     loop_print_nome:
         MOV DL, nomes[DI]
         INT 21h
@@ -159,13 +163,13 @@ loop_todos_alunos:
     XOR AX, AX
     XOR CX, CX
 
-    MOV BP, 10
+    MOV SI, 10
 
     MOV AL, notas[BX]
     loop_empilha_nota1:
         XOR DX, DX
 
-        DIV BP
+        DIV SI
         PUSH DX
         INC CL
         CMP AX, 0
@@ -186,7 +190,7 @@ loop_todos_alunos:
     loop_empilha_nota2:
         XOR DX, DX
 
-        DIV BP
+        DIV SI
         PUSH DX
         INC CL
         CMP AX, 0
@@ -207,7 +211,7 @@ loop_todos_alunos:
     loop_empilha_nota3:
         XOR DX, DX
 
-        DIV BP
+        DIV SI
         PUSH DX
         INC CL
         CMP AX, 0
@@ -221,9 +225,19 @@ loop_todos_alunos:
         INT 21h
         DEC CL
         JNZ loop_print_nota3
-    nl
+
+    space
+
+    POP SI
+    MOV AH, 02h
+    MOV DL, medias[SI]
+    OR DL, 30h
+    INT 21h
+    new_line
+
 
     INC BX
+    INC SI
     POP CX
     DEC CX
     JZ sair_tabela
@@ -235,12 +249,12 @@ nenhum_cadastro:
     INT 21h
 
 sair_tabela:
-    nl
+    new_line
     MOV AH, 09h
     MOV DX, OFFSET pede_enter
     INT 21h
     input
-    nl
+    new_line
     POP AX
     RET
 ENDP
@@ -258,10 +272,10 @@ inserir_dados PROC NEAR ;insere nome e notas dos alunos                     PRON
     MOV DX, OFFSET cadastro_max
     INT 21h
 
-    nl
+    new_line
     MOV DX, OFFSET pede_enter
     INT 21h
-    nl
+    new_line
     input
     JMP sair_inserir_dados
 
@@ -269,7 +283,7 @@ dados_n_cheios:         ;ainda nao tem 5 alunos
 
     MOV DI, AX
     XOR SI, SI          ;coluna
-    MOV CX, 30          ;tamanho das string
+    MOV CX, NAME_LENGTH          ;tamanho das string
     MUL CX
     MOV BX, AX          ;linha do aluno a ser cadastrado
     
@@ -395,7 +409,7 @@ sair_p3:                        ;digitou enter
     MOV notas[DI], AL           ;salva nota p3
     INC DI
 
-    nl  ;enter
+    new_line  ;enter
 
     MOV AH, 09h
     MOV DX, OFFSET cadastro_ok
@@ -404,12 +418,12 @@ sair_p3:                        ;digitou enter
     MOV AL, cadastros
     INC AL
     MOV cadastros, AL
-    nl  ;enter
+    new_line  ;enter
     
     MOV AH, 09h
     MOV DX, OFFSET pede_enter
     INT 21h
-    nl  ;enter
+    new_line  ;enter
     input
 sair_inserir_dados:
     POP AX
@@ -423,15 +437,15 @@ mudar_dados PROC NEAR   ;muda nota de 1 aluno
     RET
 ENDP
 
-calcula_media PROC NEAR ;calcula media dos alunos para função print_tabela  PONTO FLUTUANTE??????
+calcula_media PROC NEAR ;calcula media dos alunos para função print_tabela  PRONTO
     PUSH AX
 
     XOR SI, SI  ;linha matriz das notas
     XOR BX, BX  ;coluna matriz das notas
 
-    XOR AX, AX
     MOV CL, cadastros   ;contador quantidade de cadastros
     MOV CH, 3   ;contador de notas p/ aluno
+    XOR AX, AX
 soma_media:
     MOV AH, notas[SI][BX]
     ADD AL, AH  ;soma
@@ -444,20 +458,25 @@ soma_media:
     ADD SI, 3   ;prox linha
     XOR BX, BX  ;coluna 0
     MOV CH, 3   ;contador de notas p/ aluno
+    XOR AX, AX
     DEC CL      ;-1 aluno
     JNZ soma_media
 
-    MOV CX, cadastros
-    MOV SI, CX  ;espaco do array de medias
-    DEC SI      ;final do array
+    XOR CX, CX
+    MOV CL, cadastros
+    MOV SI, CX
     MOV BX, 3
+
 divide_media:
     XOR DX, DX
     POP AX
     DIV BX
-
+    DEC SI
+    MOV medias[SI], AL
+    LOOP divide_media
 
     POP AX
     RET
 ENDP
+
 END MAIN
