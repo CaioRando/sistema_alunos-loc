@@ -31,7 +31,7 @@ new_line  MACRO   ;print 'enter'
     POP AX
 ENDM
 
-space MACRO ;print 'tab'
+tab MACRO ;print 'tab'
     PUSH AX
     PUSH DX
 
@@ -70,7 +70,8 @@ ENDM
 
     cadastros       DB  0
 
-    header_tabela   DB  'Nomes', 4 DUP (9), 'P1', 9, 'P2', 9, 'P3', 9, 'Media', 10, 13, '$'
+    header_tabela   DB  'NOMES', 4 DUP (9), 'P1', 9, 'P2', 9, 'P3', 4 DUP (' '), 'MEDIAS', 10, 13, '$'
+    separa_tabela   DB  69 DUP ('-'), '$'
 
     menu_geral      DB  '1. Ver tabela', 10, 13
                     DB  '2. Inserir aluno', 10, 13
@@ -80,9 +81,9 @@ ENDM
     pede_enter      DB  'Pressione <enter>$'
 
     pede_nome       DB  'Digite o nome do aluno: $'
-    pede_p1         DB  'Digite a nota da P1: $'
-    pede_p2         DB  'Digite a nota da P2: $'
-    pede_p3         DB  'Digite a nota da P3: $'
+    pede_provas     DB  'Digite a nota da P1: $'        ;22 caracteres
+                    DB  'Digite a nota da P2: $'        ;22 caracteres
+                    DB  'Digite a nota da P3: $'        ;22 caracteres
 
     cadastro_max    DB  'Ja possui 5 alunos cadastrados$'
     cadastro_ok     DB  'Cadastro realizado com sucesso!$'
@@ -127,7 +128,7 @@ sair:
     INT 21h
 ENDP
 
-print_menu PROC NEAR    ;print opcoes do menu                               PRONTO
+print_menu PROC     ;print opcoes do menu                               PRONTO
     PUSH AX
 
     new_line  ;enter
@@ -140,18 +141,22 @@ print_menu PROC NEAR    ;print opcoes do menu                               PRON
     RET
 ENDP
 
-print_tabela PROC NEAR  ;print nome, notas e media dos alunos               PRONTO
+print_tabela PROC   ;print nome, notas e media dos alunos               PRONTO
     PUSH AX
 
     MOV CL, cadastros
     OR CL, CL
-    JZ nenhum_cadastro
+    JNZ da_para_cadastrar
+    JMP nenhum_cadastro
 
+da_para_cadastrar:
     CALL calcula_media
 
+
     MOV AH, 09h
-    MOV DX, OFFSET header_tabela   ;prita header
+    MOV DX, OFFSET header_tabela   ;printa cabeçalho
     INT 21H
+
 
     XOR DI, DI              ;endereço nomes
     XOR CX, CX
@@ -162,6 +167,11 @@ print_tabela PROC NEAR  ;print nome, notas e media dos alunos               PRON
 loop_todos_alunos:
     PUSH CX                 ;guarda contador de quantos alunos tem que imprimir
     PUSH SI                 ;prox media
+
+    MOV AH, 09h
+    MOV DX, OFFSET separa_tabela
+    INT 21h
+    new_line    ;enter
 
     MOV AH, 02h
     MOV CL, NAME_LENGTH     ;contador caracteres por nome
@@ -174,14 +184,14 @@ loop_todos_alunos:
 
     MOV CX, 3               ;3 notas
 
-    space
+    tab
 printa_notas:
     XOR AX, AX
     MOV AL, notas[BX]       ;nota em AX
 
     CALL print_decimal      ;printa as notas
 
-    space
+    tab         ;printa tab
     INC BX
     LOOP printa_notas
   
@@ -190,7 +200,8 @@ printa_notas:
     POP SI                  ;endereco guardado da media
     MOV AL, medias[SI]      ;media em AX
     CALL print_decimal      ;print
-    new_line
+
+    new_line    ;enter
 
     INC SI                  ;prox media
     POP CX
@@ -204,18 +215,22 @@ nenhum_cadastro:
     INT 21h
 
 sair_tabela:
-    new_line
+
+    new_line    ;enter
+    new_line    ;enter
     MOV AH, 09h
-    MOV DX, OFFSET pede_enter
+    MOV DX, OFFSET pede_enter   ;pede input
     INT 21h
-    input
-    new_line
+    input       ;espera input
+    new_line    ;enter
+
     POP AX
     RET
 ENDP
 
-inserir_dados PROC NEAR ;insere nome e notas dos alunos
+inserir_dados PROC  ;insere nome e notas dos alunos                     PRONTO
     PUSH AX
+
     XOR AX, AX
     XOR BX, BX
 
@@ -223,6 +238,7 @@ inserir_dados PROC NEAR ;insere nome e notas dos alunos
     CMP AL, 5
     JNE dados_n_cheios
 
+    ;aviso de cadastro cheio e volta para o menu
     MOV AH, 09h         ;5 alunos cadastrados
     MOV DX, OFFSET cadastro_max
     INT 21h
@@ -234,165 +250,79 @@ inserir_dados PROC NEAR ;insere nome e notas dos alunos
     input
     JMP sair_inserir_dados
 
-dados_n_cheios:         ;ainda nao tem 5 alunos
+    ;cadastro nao esta cheio
+dados_n_cheios:
 
-    MOV DI, AX
-    XOR SI, SI          ;coluna
-    MOV CX, NAME_LENGTH          ;tamanho das string
-    MUL CX
-    MOV BX, AX          ;linha do aluno a ser cadastrado
+    MOV DI, AX              ;quantidade de alunos cadastrados
+    XOR SI, SI              ;coluna do nome
+
+    MOV CX, NAME_LENGTH     ;tamanho das string
+    MUL CX                  ;qnt de alunos cadastrados x30
+    MOV BX, AX              ;linha do aluno a ser cadastrado
     
     MOV AH, 09h
     MOV DX, OFFSET pede_nome    ;print pedindo nome
     INT 21h
 
-escrever_nome:
-    MOV AH, 01h                 ;le nome do aluno
-    INT 21h
+escrever_nome:                  ;le nome do aluno
+    MOV AH, 01h                 
+    INT 21h                     ;le caracter
 
     CMP AL, 13
-    JE terminou_nome             ;enter
-    MOV nomes[BX+SI], AL
+    JE terminou_nome            ;enter
+    MOV nomes[BX+SI], AL        ;salva caracter
     INC SI
-    JMP escrever_nome
+    LOOP escrever_nome          ;30 caracteres
 
 terminou_nome:
-    XOR AX, AX
-    MOV CX, 3                   ;x3
+
     MOV AX, DI                  ;numero do aluno
-    MUL CX                      ;linha na matriz notas - DI
-    MOV DI, AX
+    MOV CX, 3                   ;x3
+    MUL CX                      
+    MOV DI, AX                  ;linha na matriz notas - DI
 
+    MOV DX, OFFSET pede_provas  ;end pedindo provas
+le_notas:
+    new_line  ;enter
     MOV AH, 09h
-    MOV DX, OFFSET pede_p1      ;print pedindo p1
-    INT 21h
+    INT 21h                     ;printa pedindo provas
 
-    XOR CX, CX                  ;contador de numeros inseridos
-    MOV BX, 10
-le_p1:                          ;le p1
-    MOV AH, 01h
-    INT 21h
-    CMP AL, 13                  ;cmp enter
-    JE sair_p1
+    CALL le_decimal             ;le nota
+    MOV notas[DI], AL           ;guarda nota
+    INC DI                      ;endereco pra prox prova
 
-    AND AL, 0Fh
-
-    CMP CX, 0
-    JNE pilha_p1                ;nao é primeiro digito
-
-    XOR AH, AH
-    PUSH AX 
-    INC CX
-    JMP le_p1
-
-pilha_p1:
-    MOV DL, AL                  ;guarda AL
-    POP AX                      ;pega primeiro digito
-    MUL BX                      ;primeiro digito x10
-    ADD AL, DL                  ;primeiro_d x10 + segundo digito
-    PUSH AX                     ;salva numero
-    JMP le_p1
-
-sair_p1:                        ;digitou enter
-    POP AX
-    MOV notas[DI], AL           ;guarda nota p1
-    INC DI                      ;endereco pra p2
-
-    MOV AH, 09h
-    MOV DX, OFFSET pede_p2      ;print pedindo p2
-    INT 21h
-
-    XOR CX, CX                  ;contador
-le_p2:                          ;le p2
-    MOV AH, 01h
-    INT 21h
-    CMP AL, 13
-    JE sair_p2
-
-    AND AL, 0Fh
-
-    CMP CX, 0                   ;ve se eh primeiro digito
-    JNE pilha_p2
-
-    XOR AH, AH
-    PUSH AX 
-    INC CX
-    JMP le_p2
-
-pilha_p2:                       ;primeiro_d x 10 + segundo digito
-    MOV DL, AL
-    POP AX
-    MUL BX
-    ADD AL, DL
-    PUSH AX                     ;guarda numero na pilha
-    JMP le_p2
-sair_p2:
-    POP AX
-    MOV notas[DI], AL           ;salva nota p2
-    INC DI
-
-    MOV AH, 09h
-    MOV DX, OFFSET pede_p3      ;print pedindo p3
-    INT 21h
-
-    XOR CX, CX                  ;contador
-le_p3:                          ;le p3
-    MOV AH, 01h
-    INT 21h
-    CMP AL, 13
-    JE sair_p3
-
-    AND AL, 0Fh
-
-    CMP CX, 0
-    JNE pilha_p3
-
-    XOR AH, AH
-    PUSH AX 
-    INC CX
-    JMP le_p3
-
-pilha_p3:                       ;primeiro_d x 10 + segundo digito
-    MOV DL, AL
-    POP AX
-    MUL BX
-    ADD AL, DL
-    PUSH AX                     ;guarda nota na pilha
-    JMP le_p3
-sair_p3:                        ;digitou enter
-    POP AX
-    MOV notas[DI], AL           ;salva nota p3
-    INC DI
+    ADD DX, 22                  ;+22 caracteres para printar pedindo a prox prova
+    LOOP le_notas
 
     new_line  ;enter
 
     MOV AH, 09h
-    MOV DX, OFFSET cadastro_ok
+    MOV DX, OFFSET cadastro_ok  ;printa aviso de cadastro realizado
     INT 21h
 
     MOV AL, cadastros
     INC AL
     MOV cadastros, AL
-    new_line  ;enter
+    new_line    ;enter
     
     MOV AH, 09h
     MOV DX, OFFSET pede_enter
     INT 21h
-    new_line  ;enter
-    input
+    new_line    ;enter
+    input       ;espera input
 sair_inserir_dados:
     POP AX
     RET
 ENDP
 
-mudar_dados PROC NEAR   ;muda nota de 1 aluno
+mudar_dados PROC    ;muda nota de 1 aluno
     PUSH AX
 
     POP AX
     RET
 ENDP
 
-calcula_media PROC NEAR ;calcula media dos alunos para função print_tabela  PRONTO
+calcula_media PROC  ;calcula media dos alunos para função print_tabela  PRONTO
     PUSH AX
 
     XOR SI, SI  ;linha matriz das notas
@@ -434,7 +364,39 @@ divide_media:
     RET
 ENDP
 
-print_decimal PROC NEAR ;printa decimais (numero em AX)
+le_decimal PROC     ;le numeros decimais e coloca em AX                 PRONTO
+    PUSH BX
+    PUSH CX
+    PUSH DX
+
+    MOV BX, 10      ;multiplicacao
+    XOR AX, AX      ;soma
+    XOR CX, CX
+
+le_numero:
+    PUSH AX         ;salva na pilha a soma (0 no primeiro numero)
+    MOV AH, 01h
+    INT 21h         ;le caracter
+    CMP AL, 13
+    JE sai_le_decimal
+
+    AND AL, 0Fh     ;transforma em numero
+    MOV CL, AL      ;guarda numero temporariamente
+    POP AX          ;pega resultado da soma anterior (ou 0)
+    MUL BX
+    ADD AX, CX      ;soma em AX
+    JMP le_numero
+
+sai_le_decimal:
+    POP AX          ;resultado em AX
+
+    POP DX
+    POP CX
+    POP BX
+    RET
+ENDP
+
+print_decimal PROC  ;printa decimais (numero em AX)                     PRONTO
     PUSH BX
     PUSH CX
     PUSH DX
