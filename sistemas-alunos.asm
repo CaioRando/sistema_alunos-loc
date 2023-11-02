@@ -89,6 +89,18 @@ ENDM
     cadastro_ok     DB  'Cadastro realizado com sucesso!$'
     cadastro_vazio  DB  'Nenhum aluno cadastrado$'
 
+    ask_nome_mudar  DB  'Deseja alterar a nota de qual aluno?', 10, 13, '$'
+    checar_nome     DB  NAME_LENGTH DUP (?)
+    nome_nao_existe DB  'Nome digitado nao existe$'
+    confirmar_nome  DB  'Escolha qual prova alterar do aluno - $'
+    
+    opcoes_provas   DB  '1. Alterar P1', 10, 13
+                    DB  '2. Alterar P2', 10, 13
+                    DB  '3. Alterar P3', 10, 13
+                    DB  '0. Voltar ao Menu', 10, 13, '$'
+
+    ask_nova_nota   DB  'Digite a nota da P$'
+    nota_alterada DB  'Nota alterada com sucesso!$'
 
 .CODE
 main PROC
@@ -106,13 +118,22 @@ menu:
     JE tabela   ;1. tabela
     JB sair     ;0. sair
 
-    CMP AL, 2
-    JE inserir  ;2. inserir
-    JA corrigir ;3. corrigir
+    CMP AL, 3
+    JB inserir  ;2. inserir
+    JE corrigir ;3. corrigir
     JMP menu
 
 tabela:
     CALL print_tabela
+    PUSH AX
+
+    new_line    ;enter
+    MOV AH, 09h
+    MOV DX, OFFSET pede_enter   ;pede input
+    INT 21h
+    input       ;espera input
+    new_line    ;enter
+    POP AX
     JMP menu
 
 inserir:
@@ -128,7 +149,7 @@ sair:
     INT 21h
 ENDP
 
-print_menu PROC     ;print opcoes do menu                               PRONTO
+print_menu PROC     ;print opcoes do menu
     PUSH AX
 
     new_line  ;enter
@@ -141,13 +162,13 @@ print_menu PROC     ;print opcoes do menu                               PRONTO
     RET
 ENDP
 
-print_tabela PROC   ;print nome, notas e media dos alunos               PRONTO
+print_tabela PROC   ;print nome, notas e media dos alunos
     PUSH AX
 
     MOV CL, cadastros
     OR CL, CL
     JNZ da_para_cadastrar
-    JMP nenhum_cadastro
+    JMP nenhum_cadastro_tabela
 
 da_para_cadastrar:
     CALL calcula_media
@@ -209,26 +230,18 @@ printa_notas:
     JZ sair_tabela          ;jmp if qnt de alunos = 0
     JMP loop_todos_alunos
 
-nenhum_cadastro:
+nenhum_cadastro_tabela:
     MOV AH, 09h
     MOV DX, OFFSET cadastro_vazio   ;printa aviso
     INT 21h
 
 sair_tabela:
 
-    new_line    ;enter
-    new_line    ;enter
-    MOV AH, 09h
-    MOV DX, OFFSET pede_enter   ;pede input
-    INT 21h
-    input       ;espera input
-    new_line    ;enter
-
     POP AX
     RET
 ENDP
 
-inserir_dados PROC  ;insere nome e notas dos alunos                     PRONTO
+inserir_dados PROC  ;insere nome e notas dos alunos
     PUSH AX
 
     XOR AX, AX
@@ -318,11 +331,186 @@ ENDP
 mudar_dados PROC    ;muda nota de 1 aluno
     PUSH AX
 
+    MOV CL, cadastros
+    OR CL, CL
+    JNZ tem_cadastro_p_mudar
+    JMP nenhum_cadastro_dados
+tem_cadastro_p_mudar:
+    CALL print_tabela
+    
+    new_line
+    MOV AH, 09h
+    MOV DX, OFFSET ask_nome_mudar   ;pede nome p/ mudar
+    INT 21h
+    
+    ;le nome                    *************************
+    MOV CX, NAME_LENGTH
+    XOR DI, DI      ;posicao array checar_nome
+    MOV AH, 01h
+le_nome_p_checar:
+    INT 21h
+    CMP AL, 13
+    JE sai_le_nome_p_checar
+
+    MOV checar_nome[DI], AL ;salva nome
+    INC DI
+    LOOP le_nome_p_checar
+
+sai_le_nome_p_checar:
+;checar se nome existe      *************************
+    XOR CX, CX
+    MOV CL, cadastros   ;quantidade de nomes a checar
+
+    MOV DH, 10      ;checar 10 primeiros caracteres
+    XOR DL, DL      ;contador linha notas
+
+    XOR SI, SI      ;linha na matriz dos nomes
+
+    XOR BX, BX      ;coluna no array checar_nome e na matriz dos nomes
+checar_nomes_loop:
+    MOV AL, checar_nome[BX] ;caracter do nome digitado
+    MOV AH, nomes[SI][BX]   ;caracter da matriz de nomes
+
+    CMP AL, AH
+    JE caracter_igual       ;se forem iguais
+    
+    ADD DL, 3               ;contador linha das notas
+    MOV BX, NAME_LENGTH     ;caracteres diferentes
+    ADD SI, BX      ;prox nome
+
+    XOR BX, BX
+    MOV DH, 10       ;contador de caracteres iguais
+    LOOP checar_nomes_loop
+
+;nome nao existe
+    new_line
+    MOV AH, 09h
+    MOV DX, OFFSET nome_nao_existe
+    INT 21h
+    JMP sair_mudar_dados
+
+caracter_igual:         ;+1 caracter igual
+    INC BX              ;prox caracter
+    DEC DH              ;contador = 0?
+    JNZ checar_nomes_loop
+
+    PUSH DX
+    new_line
+    MOV AH, 09h
+    MOV DX, OFFSET confirmar_nome
+    INT 21h
+
+    XOR BX, BX
+    MOV AH, 02h
+    MOV CX, NAME_LENGTH
+print_nome_confirmar:
+    MOV DL, nomes[SI][BX]
+    INT 21h
+    INC BX
+    LOOP print_nome_confirmar
+    
+;perguntar qual nota mudar  *************************
+    new_line
+    MOV AH, 09h
+    MOV DX, OFFSET opcoes_provas
+    INT 21h
+
+    MOV AH, 08h
+    INT 21h
+    AND AL, 0Fh
+    MOV CL, AL      ;salva temporariamente prova selecionada
+
+    new_line
+    CMP AL, 1
+    JE alterar_p1   ;1. alterar p1
+    JB nao_alterar  ;0. menu
+
+    CMP AL, 3
+    JB alterar_p2   ;2. alterar p2
+    JE alterar_p3   ;3. alterar p3
+nao_alterar:
+    POP SI
+    JMP sair_alteracao
+
+;mudar nota                 *************************
+alterar_p1:
+    MOV AH, 09h
+    MOV DX, OFFSET ask_nova_nota
+    INT 21h
+;printa qual prova mudar
+    MOV AH, 02h
+    MOV AL, CL
+    OR AL, 30h
+    MOV DL, AL
+    INT 21h
+    new_line
+
+    CALL le_decimal
+    POP SI              ;contador linha notas
+    MOV BX, 0
+    MOV notas[SI][BX], AL
+
+    JMP sair_mudar_dados
+alterar_p2:
+    MOV AH, 09h
+    MOV DX, OFFSET ask_nova_nota
+    INT 21h
+;printa qual prova mudar
+    MOV AH, 02h
+    MOV AL, CL
+    OR AL, 30h
+    MOV DL, AL
+    INT 21h
+    new_line
+
+    CALL le_decimal
+    POP SI              ;contador linha notas
+    MOV BX, 1
+    MOV notas[SI][BX], AL
+
+    JMP sair_mudar_dados
+alterar_p3:
+    MOV AH, 09h
+    MOV DX, OFFSET ask_nova_nota
+    INT 21h
+;printa qual prova mudar
+    MOV AH, 02h
+    MOV AL, CL
+    OR AL, 30h
+    MOV DL, AL
+    INT 21h
+    new_line
+
+    CALL le_decimal
+    POP SI              ;contador linha notas
+    MOV BX, 2
+    MOV notas[SI][BX], AL
+
+    JMP sair_mudar_dados
+nenhum_cadastro_dados:
+    MOV AH, 09h
+    MOV DX, OFFSET cadastro_vazio   ;printa aviso
+    INT 21h
+    new_line    ;enter
+    JMP pedir_input
+sair_mudar_dados:
+    MOV AH, 09h
+    MOV DX, OFFSET nota_alterada
+    INT 21h
+    new_line    ;enter
+
+pedir_input:
+    MOV DX, OFFSET pede_enter   ;pede input
+    INT 21h
+    input       ;espera input
+    new_line    ;enter
+
+sair_alteracao:
     POP AX
     RET
 ENDP
 
-calcula_media PROC  ;calcula media dos alunos para função print_tabela  PRONTO
+calcula_media PROC  ;calcula media dos alunos para função print_tabela
     PUSH AX
 
     XOR SI, SI  ;linha matriz das notas
@@ -364,7 +552,7 @@ divide_media:
     RET
 ENDP
 
-le_decimal PROC     ;le numeros decimais e coloca em AX                 PRONTO
+le_decimal PROC     ;le numeros decimais e coloca em AX
     PUSH BX
     PUSH CX
     PUSH DX
@@ -396,7 +584,7 @@ sai_le_decimal:
     RET
 ENDP
 
-print_decimal PROC  ;printa decimais (numero em AX)                     PRONTO
+print_decimal PROC  ;printa decimais (numero em AX)
     PUSH BX
     PUSH CX
     PUSH DX
