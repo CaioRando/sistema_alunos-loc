@@ -31,7 +31,7 @@ new_line  MACRO   ;print 'enter'
     POP AX
 ENDM
 
-space MACRO ;print 'space'
+space MACRO ;print 'tab'
     PUSH AX
     PUSH DX
 
@@ -70,21 +70,23 @@ ENDM
 
     cadastros       DB  0
 
-    menu_geral      DB  "1. Ver tabela", 10, 13
-                    DB  "2. Inserir aluno", 10, 13
-                    DB  "3. Corrigir notas", 10, 13
-                    DB  "0. Sair", 10, 13, '$'
+    header_tabela   DB  'Nomes', 4 DUP (9), 'P1', 9, 'P2', 9, 'P3', 9, 'Media', 10, 13, '$'
 
-    pede_enter      DB  "Pressione <enter>$"
+    menu_geral      DB  '1. Ver tabela', 10, 13
+                    DB  '2. Inserir aluno', 10, 13
+                    DB  '3. Corrigir notas', 10, 13
+                    DB  '0. Sair', 10, 13, '$'
 
-    pede_nome       DB  "Digite o nome do aluno: $"
-    pede_p1         DB  "Digite a nota da P1: $"
-    pede_p2         DB  "Digite a nota da P2: $"
-    pede_p3         DB  "Digite a nota da P3: $"
+    pede_enter      DB  'Pressione <enter>$'
 
-    cadastro_max    DB  "Ja possui 5 alunos cadastrados$"
-    cadastro_ok     DB  "Cadastro realizado com sucesso!$"
-    cadastro_vazio  DB  "Nenhum aluno cadastrado$"
+    pede_nome       DB  'Digite o nome do aluno: $'
+    pede_p1         DB  'Digite a nota da P1: $'
+    pede_p2         DB  'Digite a nota da P2: $'
+    pede_p3         DB  'Digite a nota da P3: $'
+
+    cadastro_max    DB  'Ja possui 5 alunos cadastrados$'
+    cadastro_ok     DB  'Cadastro realizado com sucesso!$'
+    cadastro_vazio  DB  'Nenhum aluno cadastrado$'
 
 
 .CODE
@@ -138,37 +140,38 @@ print_menu PROC NEAR    ;print opcoes do menu                               PRON
     RET
 ENDP
 
-print_tabela PROC NEAR  ;print nome, notas e media dos alunos
+print_tabela PROC NEAR  ;print nome, notas e media dos alunos               PRONTO
     PUSH AX
 
     MOV CL, cadastros
     OR CL, CL
-    JNZ tem_cadastro
-    JMP nenhum_cadastro
+    JZ nenhum_cadastro
 
-tem_cadastro:
     CALL calcula_media
+
+    MOV AH, 09h
+    MOV DX, OFFSET header_tabela   ;prita header
+    INT 21H
 
     XOR DI, DI              ;endereço nomes
     XOR CX, CX
     XOR SI, SI              ;endereço medias
+    XOR BX, BX              ;endereço notas
 
-    MOV CL, cadastros
+    MOV CL, cadastros       ;contador de alunos
 loop_todos_alunos:
     PUSH CX                 ;guarda contador de quantos alunos tem que imprimir
     PUSH SI                 ;prox media
 
     MOV AH, 02h
-    MOV CL, NAME_LENGTH              ;contador caracteres p/ nome
+    MOV CL, NAME_LENGTH     ;contador caracteres por nome
     loop_print_nome:
         MOV DL, nomes[DI]
         INT 21h
-        INC DI
+        INC DI              ;prox caracter
         DEC CL
         JNZ loop_print_nome
 
-
-    XOR BX, BX              ;endereço notas
     MOV CX, 3               ;3 notas
 
     space
@@ -176,31 +179,28 @@ printa_notas:
     XOR AX, AX
     MOV AL, notas[BX]       ;nota em AX
 
-    CALL print_decimal
+    CALL print_decimal      ;printa as notas
 
     space
     INC BX
     LOOP printa_notas
   
 
-    POP SI
-    MOV AH, 02h
-    MOV DL, medias[SI]
-    OR DL, 30h
-    INT 21h
+    XOR AX, AX
+    POP SI                  ;endereco guardado da media
+    MOV AL, medias[SI]      ;media em AX
+    CALL print_decimal      ;print
     new_line
 
-
-    INC BX
-    INC SI
+    INC SI                  ;prox media
     POP CX
-    DEC CX
-    JZ sair_tabela
+    DEC CX                  ;qnt de alunos - 1
+    JZ sair_tabela          ;jmp if qnt de alunos = 0
     JMP loop_todos_alunos
 
 nenhum_cadastro:
     MOV AH, 09h
-    MOV DX, OFFSET cadastro_vazio
+    MOV DX, OFFSET cadastro_vazio   ;printa aviso
     INT 21h
 
 sair_tabela:
@@ -214,7 +214,7 @@ sair_tabela:
     RET
 ENDP
 
-inserir_dados PROC NEAR ;insere nome e notas dos alunos                     PRONTO
+inserir_dados PROC NEAR ;insere nome e notas dos alunos
     PUSH AX
     XOR AX, AX
     XOR BX, BX
