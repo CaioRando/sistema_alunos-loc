@@ -404,7 +404,7 @@ checar_nomes_loop:
     ADD SI, BX      ;prox nome
 
     XOR BX, BX
-    MOV DH, 10       ;contador de caracteres iguais
+    MOV DH, NAME_LENGTH       ;contador de caracteres iguais
     LOOP checar_nomes_loop
 
 ;nome nao existe
@@ -420,7 +420,7 @@ caracter_igual:         ;+1 caracter igual
     DEC DH              ;contador = 0?
     JNZ checar_nomes_loop
 
-    PUSH DX
+    PUSH DX             ;push linha matriz de notas
     new_line
     MOV AH, 09h
     MOV DX, OFFSET confirmar_nome
