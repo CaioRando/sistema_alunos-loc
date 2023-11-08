@@ -100,7 +100,7 @@ ENDM
                     DB  '0. Voltar ao Menu', 10, 13, '$'
 
     ask_nova_nota   DB  'Digite a nota da P$'
-    nota_alterada DB  'Nota alterada com sucesso!$'
+    nota_alterada   DB  'Nota alterada com sucesso!$'
 
 .CODE
 main PROC
@@ -115,8 +115,8 @@ menu:
 
     new_line
     CMP AL, 1
-    JE tabela   ;1. tabela
     JB sair     ;0. sair
+    JE tabela   ;1. tabela
 
     CMP AL, 3
     JB inserir  ;2. inserir
