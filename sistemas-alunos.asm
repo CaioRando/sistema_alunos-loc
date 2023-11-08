@@ -187,7 +187,6 @@ da_para_cadastrar:
     MOV CL, cadastros       ;contador de alunos
 loop_todos_alunos:
     PUSH CX                 ;guarda contador de quantos alunos tem que imprimir
-    PUSH SI                 ;prox media
 
     MOV AH, 09h
     MOV DX, OFFSET separa_tabela
@@ -218,7 +217,6 @@ printa_notas:
   
 
     XOR AX, AX
-    POP SI                  ;endereco guardado da media
     MOV AL, medias[SI]      ;media em AX
     CALL print_decimal      ;print
 
