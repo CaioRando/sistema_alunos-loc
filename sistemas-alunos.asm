@@ -2,7 +2,7 @@
 ;Supor  trabalhar  só  com  números  inteiros.
 
 ;O programa deverá permitir a inserção dos nomes dos alunos,
-;de  suas  notas  e  calcular  a  média  aritmética.
+;de  suas  notas  e  calcular  a  média  ponderada.
 ;Deverá também permitir a correção das notas, através do nome e da avaliação.
 ;Deverá permitir a impressão da planilha  de  notas.
 
@@ -68,7 +68,13 @@ ENDM
 
     medias          DB  5 DUP (?)                       ;Array para as 5 medias
 
-    cadastros       DB  0
+
+    cadastros       DB  0                               ;qnt de alunos cadastrados
+
+    pesos_provas    DB  3 DUP (1)                       ;peso de cada prova (1 como padrao)
+    pede_pesos      DB  'Digite o peso da P1: $'        ;22 caracteres
+                    DB  'Digite o peso da P2: $'        ;22 caracteres
+                    DB  'Digite o peso da P3: $'        ;22 caracteres 
 
     header_tabela   DB  'NOMES', 4 DUP (9), 'P1', 9, 'P2', 9, 'P3', 4 DUP (' '), 'MEDIAS', 10, 13, '$'
     separa_tabela   DB  69 DUP ('-'), '$'
@@ -76,6 +82,7 @@ ENDM
     menu_geral      DB  '1. Ver tabela', 10, 13
                     DB  '2. Inserir aluno', 10, 13
                     DB  '3. Corrigir notas', 10, 13
+                    DB  '4. Definir peso', 10, 13
                     DB  '0. Sair', 10, 13, '$'
 
     pede_enter      DB  'Pressione <enter>$'
@@ -121,6 +128,9 @@ menu:
     CMP AL, 3
     JB inserir  ;2. inserir
     JE corrigir ;3. corrigir
+
+    CMP AL, 4
+    JE pesos    ;4. pesos
     JMP menu
 
 tabela:
@@ -142,6 +152,10 @@ inserir:
 
 corrigir:
     CALL mudar_dados
+    JMP menu
+
+pesos:
+    CALL inserir_pesos
     JMP menu
 
 sair:
@@ -248,7 +262,6 @@ inserir_dados PROC  ;insere nome e notas dos alunos
     MOV AL, cadastros   ;checa se tem 5 alunos cadastrados
     CMP AL, 5
     JNE dados_n_cheios
-
     ;aviso de cadastro cheio e volta para o menu
     MOV AH, 09h         ;5 alunos cadastrados
     MOV DX, OFFSET cadastro_max
@@ -523,6 +536,28 @@ sair_alteracao:
     RET
 ENDP
 
+inserir_pesos PROC  ;inserir o peso das 3 provas
+    PUSH AX
+
+    XOR SI, SI
+    MOV DX, OFFSET pede_pesos
+    MOV CX, 3
+
+    new_line
+le_pesos:
+    MOV AH, 09h
+    INT 21h
+    CALL le_decimal
+    MOV pesos_provas[SI], AL
+    ADD DX, 22
+    new_line
+    INC SI
+    LOOP le_pesos
+
+    POP AX
+    RET
+ENDP
+
 calcula_media PROC  ;calcula media dos alunos para função print_tabela
     PUSH AX
 
@@ -531,27 +566,42 @@ calcula_media PROC  ;calcula media dos alunos para função print_tabela
 
     MOV CL, cadastros   ;contador quantidade de cadastros
     MOV CH, 3   ;contador de notas p/ aluno
-    XOR AX, AX
+    XOR DX, DX
+
 soma_media:
-    MOV AH, notas[SI][BX]
-    ADD AL, AH  ;soma
+    MOV AL, notas[SI][BX]
+    MOV AH, pesos_provas[BX]
+    MUL AH
+    ADD DL, AL  ;soma
     INC BX      ;prox coluna
     DEC CH
     JNZ soma_media
 
-    XOR AH, AH 
-    PUSH AX     ;salva soma das notas (invertida)
+
+    PUSH DX     ;salva soma das notas (invertida)
     ADD SI, 3   ;prox linha
     XOR BX, BX  ;coluna 0
     MOV CH, 3   ;contador de notas p/ aluno
-    XOR AX, AX
+    XOR DX, DX
     DEC CL      ;-1 aluno
     JNZ soma_media
+
+
+    MOV CX, 3
+    XOR AX, AX
+    XOR BX, BX
+soma_pesos:
+    MOV AH, pesos_provas[BX]
+    ADD AL, AH
+    INC BX
+    LOOP soma_pesos
+    XOR BX, BX
+    MOV BL, AL
 
     XOR CX, CX
     MOV CL, cadastros
     MOV SI, CX
-    MOV BX, 3
+
 
 divide_media:
     XOR DX, DX
