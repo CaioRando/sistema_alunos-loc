@@ -2,7 +2,7 @@
 ;Supor  trabalhar  só  com  números  inteiros.
 
 ;O programa deverá permitir a inserção dos nomes dos alunos,
-;de  suas  notas  e  calcular  a  média  ponderada.
+;de  suas  notas  e  calcular  a  média  aritmética.
 ;Deverá também permitir a correção das notas, através do nome e da avaliação.
 ;Deverá permitir a impressão da planilha  de  notas.
 
@@ -283,6 +283,20 @@ escrever_nome:                  ;le nome do aluno
 
     CMP AL, 13
     JE terminou_nome            ;enter
+    CMP AL, 8
+    JNE n_backspace
+    DEC SI
+    MOV AL, ?
+    MOV nomes[BX+SI], AL        ;salva caracter
+    INC CX
+    MOV AH, 02h                 
+    MOV DL, ?                   ;printa 'nada'
+    INT 21h
+    MOV DL, 8                   ;printa 'backspace' para mandar o cursor para a esquerda
+    INT 21h
+    JMP escrever_nome
+
+n_backspace:
     MOV nomes[BX+SI], AL        ;salva caracter
     INC SI
     LOOP escrever_nome          ;30 caracteres
@@ -343,7 +357,7 @@ tem_cadastro_p_mudar:
     MOV DX, OFFSET ask_nome_mudar   ;pede nome p/ mudar
     INT 21h
     
-    ;le nome                    *************************
+    ;le nome
     MOV CX, NAME_LENGTH
     XOR DI, DI      ;posicao array checar_nome
     MOV AH, 01h
@@ -357,11 +371,11 @@ le_nome_p_checar:
     LOOP le_nome_p_checar
 
 sai_le_nome_p_checar:
-;checar se nome existe      *************************
+;checar se nome existe
     XOR CX, CX
     MOV CL, cadastros   ;quantidade de nomes a checar
 
-    MOV DH, 10      ;checar 10 primeiros caracteres
+    MOV DH, NAME_LENGTH      ;checar todos caracteres
     XOR DL, DL      ;contador linha notas
 
     XOR SI, SI      ;linha na matriz dos nomes
@@ -387,7 +401,8 @@ checar_nomes_loop:
     MOV AH, 09h
     MOV DX, OFFSET nome_nao_existe
     INT 21h
-    JMP sair_mudar_dados
+    new_line
+    JMP  pedir_input
 
 caracter_igual:         ;+1 caracter igual
     INC BX              ;prox caracter
