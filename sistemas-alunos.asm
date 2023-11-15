@@ -701,6 +701,7 @@ le_numero:
     MOV DL, ' '
     INT 21h
     POP AX
+    XOR AX, AX
     JMP le_numero
 
 backspace_dec:
