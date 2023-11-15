@@ -50,30 +50,6 @@ input MACRO ;espera input do user
     POP AX
 ENDM
 
-limpa_tela MACRO
-    PUSH AX
-
-    MOV AX, 03h
-    INT 10h
-
-    XOR AX, AX      ;AL - Numero de linhas de Scroll -> 0 = Toda Tela
-    XOR BX, BX      ;BH - Cor
-    XOR CX, CX
-    MOV DH, 18h     ;numero de linhas a limpar
-    MOV DL, 4Fh     ;numero de colunas a limpar
-    MOV AH, 06h     ;funcao de scroll up pra limpar tela
-    INT 10h
-    
-    XOR DX, DX
-    MOV AH, 02h
-    INT 10h
-
-    MOV AX, 03h
-    INT 10h
-
-    POP AX
-ENDM
-
 .STACK 100h
 
 .DATA
@@ -138,15 +114,13 @@ main PROC
     MOV AX, @DATA
     MOV DS, AX
 
-
     MOV AH, 08h
 menu:
-    limpa_tela
     CALL print_menu
     INT 21h     ;le input user
     AND AL, 0Fh ;decimal
 
-    limpa_tela
+    new_line
     CMP AL, 1
     JB sair     ;0. sair
     JE tabela   ;1. tabela
@@ -191,6 +165,8 @@ ENDP
 
 print_menu PROC     ;print opcoes do menu
     PUSH AX
+
+    new_line  ;enter
 
     MOV AH, 09h
     MOV DX, OFFSET menu_geral
@@ -604,6 +580,7 @@ inserir_pesos PROC  ;inserir o peso das 3 provas
     MOV DX, OFFSET pede_pesos
     MOV CX, 3
 
+    new_line
 le_pesos:
     MOV AH, 09h
     INT 21h
