@@ -51,6 +51,8 @@ input MACRO ;espera input do user
 ENDM
 
 limpa_tela MACRO
+    PUSH AX
+
     MOV AX, 03h
     INT 10h
 
@@ -68,6 +70,8 @@ limpa_tela MACRO
 
     MOV AX, 03h
     INT 10h
+
+    POP AX
 ENDM
 
 .STACK 100h
@@ -103,7 +107,6 @@ ENDM
                     DB  '2. Inserir aluno', 10, 13
                     DB  '3. Corrigir notas', 10, 13
                     DB  '4. Definir peso', 10, 13
-                    DB  '4. Definir peso', 10, 13
                     DB  '0. Sair', 10, 13, '$'
 
     pede_enter      DB  'Pressione <enter>$'
@@ -136,16 +139,14 @@ main PROC
     MOV DS, AX
 
 
+    MOV AH, 08h
 menu:
     limpa_tela
-    MOV AH, 08h
     CALL print_menu
     INT 21h     ;le input user
     AND AL, 0Fh ;decimal
-    PUSH AX
-    limpa_tela
-    POP AX
 
+    limpa_tela
     CMP AL, 1
     JB sair     ;0. sair
     JE tabela   ;1. tabela
@@ -657,18 +658,6 @@ soma_pesos:
     XOR BX, BX
     MOV BL, AL
 
-
-    MOV CX, 3
-    XOR AX, AX
-    XOR BX, BX
-soma_pesos:
-    MOV AH, pesos_provas[BX]
-    ADD AL, AH
-    INC BX
-    LOOP soma_pesos
-    XOR BX, BX
-    MOV BL, AL
-
     XOR CX, CX
     MOV CL, cadastros
     MOV SI, CX
@@ -708,12 +697,10 @@ le_numero:
 ;nao permite apagar o que voce nao digitou
     OR BH, BH
     JNZ backspace_dec
-
     MOV AH, 02h
     MOV DL, ' '
     INT 21h
     POP AX
-    XOR AX, AX
     JMP le_numero
 
 backspace_dec:
@@ -776,5 +763,4 @@ desempilha_dec:
     POP BX
     RET
 ENDP
-
 END MAIN
