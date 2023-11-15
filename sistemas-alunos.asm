@@ -50,6 +50,26 @@ input MACRO ;espera input do user
     POP AX
 ENDM
 
+limpa_tela MACRO
+    MOV AX, 03h
+    INT 10h
+
+    XOR AX, AX      ;AL - Numero de linhas de Scroll -> 0 = Toda Tela
+    XOR BX, BX      ;BH - Cor
+    XOR CX, CX
+    MOV DH, 18h     ;numero de linhas a limpar
+    MOV DL, 4Fh     ;numero de colunas a limpar
+    MOV AH, 06h     ;funcao de scroll up pra limpar tela
+    INT 10h
+    
+    XOR DX, DX
+    MOV AH, 02h
+    INT 10h
+
+    MOV AX, 03h
+    INT 10h
+ENDM
+
 .STACK 100h
 
 .DATA
@@ -68,7 +88,13 @@ ENDM
 
     medias          DB  5 DUP (?)                       ;Array para as 5 medias
 
-    cadastros       DB  0
+
+    cadastros       DB  0                               ;qnt de alunos cadastrados
+
+    pesos_provas    DB  3 DUP (1)                       ;peso de cada prova (1 como padrao)
+    pede_pesos      DB  'Digite o peso da P1: $'        ;22 caracteres
+                    DB  'Digite o peso da P2: $'        ;22 caracteres
+                    DB  'Digite o peso da P3: $'        ;22 caracteres 
 
     header_tabela   DB  'NOMES', 4 DUP (9), 'P1', 9, 'P2', 9, 'P3', 4 DUP (' '), 'MEDIAS', 10, 13, '$'
     separa_tabela   DB  69 DUP ('-'), '$'
@@ -76,6 +102,7 @@ ENDM
     menu_geral      DB  '1. Ver tabela', 10, 13
                     DB  '2. Inserir aluno', 10, 13
                     DB  '3. Corrigir notas', 10, 13
+                    DB  '4. Definir peso', 10, 13
                     DB  '0. Sair', 10, 13, '$'
 
     pede_enter      DB  'Pressione <enter>$'
@@ -100,27 +127,34 @@ ENDM
                     DB  '0. Voltar ao Menu', 10, 13, '$'
 
     ask_nova_nota   DB  'Digite a nota da P$'
-    nota_alterada DB  'Nota alterada com sucesso!$'
+    nota_alterada   DB  'Nota alterada com sucesso!$'
 
 .CODE
 main PROC
     MOV AX, @DATA
     MOV DS, AX
 
-    MOV AH, 08h
+
 menu:
+    limpa_tela
+    MOV AH, 08h
     CALL print_menu
     INT 21h     ;le input user
     AND AL, 0Fh ;decimal
+    PUSH AX
+    limpa_tela
+    POP AX
 
-    new_line
     CMP AL, 1
-    JE tabela   ;1. tabela
     JB sair     ;0. sair
+    JE tabela   ;1. tabela
 
     CMP AL, 3
     JB inserir  ;2. inserir
     JE corrigir ;3. corrigir
+
+    CMP AL, 4
+    JE pesos    ;4. pesos
     JMP menu
 
 tabela:
@@ -144,6 +178,10 @@ corrigir:
     CALL mudar_dados
     JMP menu
 
+pesos:
+    CALL inserir_pesos
+    JMP menu
+
 sair:
     MOV AH, 4Ch
     INT 21h
@@ -151,8 +189,6 @@ ENDP
 
 print_menu PROC     ;print opcoes do menu
     PUSH AX
-
-    new_line  ;enter
 
     MOV AH, 09h
     MOV DX, OFFSET menu_geral
@@ -187,7 +223,6 @@ da_para_cadastrar:
     MOV CL, cadastros       ;contador de alunos
 loop_todos_alunos:
     PUSH CX                 ;guarda contador de quantos alunos tem que imprimir
-    PUSH SI                 ;prox media
 
     MOV AH, 09h
     MOV DX, OFFSET separa_tabela
@@ -218,7 +253,6 @@ printa_notas:
   
 
     XOR AX, AX
-    POP SI                  ;endereco guardado da media
     MOV AL, medias[SI]      ;media em AX
     CALL print_decimal      ;print
 
@@ -250,7 +284,6 @@ inserir_dados PROC  ;insere nome e notas dos alunos
     MOV AL, cadastros   ;checa se tem 5 alunos cadastrados
     CMP AL, 5
     JNE dados_n_cheios
-
     ;aviso de cadastro cheio e volta para o menu
     MOV AH, 09h         ;5 alunos cadastrados
     MOV DX, OFFSET cadastro_max
@@ -283,6 +316,29 @@ escrever_nome:                  ;le nome do aluno
 
     CMP AL, 13
     JE terminou_nome            ;enter
+    CMP AL, 8
+    JNE n_backspace_insere      ;backspace
+
+;nao permite apagar o que voce nao digitou
+    OR SI, SI
+    JNZ backspace_insere
+    MOV AH, 02h
+    MOV DL, ' '
+    INT 21h
+    JMP escrever_nome 
+
+backspace_insere:
+    DEC SI
+    INC CX
+    MOV DL, ?
+    MOV nomes[BX+SI], DL        ;salva 'nada'
+    MOV AH, 02h                 
+    INT 21h                     ;printa 'nada'
+    MOV DL, 8                   ;printa 'backspace' para mandar o cursor para a esquerda
+    INT 21h
+    JMP escrever_nome
+
+n_backspace_insere:
     MOV nomes[BX+SI], AL        ;salva caracter
     INC SI
     LOOP escrever_nome          ;30 caracteres
@@ -343,25 +399,48 @@ tem_cadastro_p_mudar:
     MOV DX, OFFSET ask_nome_mudar   ;pede nome p/ mudar
     INT 21h
     
-    ;le nome                    *************************
+    ;le nome
     MOV CX, NAME_LENGTH
     XOR DI, DI      ;posicao array checar_nome
-    MOV AH, 01h
 le_nome_p_checar:
+    MOV AH, 01h
     INT 21h
-    CMP AL, 13
-    JE sai_le_nome_p_checar
 
+    CMP AL, 13
+    JE sai_le_nome_p_checar ;enter
+    CMP AL, 8
+    JNE n_backspace_checa   ;backspace
+
+;nao permite apagar o que voce nao digitou
+    OR DI, DI
+    JNZ backspace_checa
+    MOV AH, 02h
+    MOV DL, 13
+    INT 21h
+    JMP le_nome_p_checar
+
+backspace_checa:
+    INC CX
+    DEC DI
+    MOV DL, ?
+    MOV checar_nome[DI], DL ;salva 'nada'
+    MOV AH, 02h
+    INT 21h                 ;printa 'nada'
+    MOV DL, 8
+    INT 21h                 ;printa 'backspace' para mandar o cursor para a esquerda
+    JMP le_nome_p_checar
+
+n_backspace_checa:
     MOV checar_nome[DI], AL ;salva nome
     INC DI
     LOOP le_nome_p_checar
 
 sai_le_nome_p_checar:
-;checar se nome existe      *************************
+;checar se nome existe
     XOR CX, CX
     MOV CL, cadastros   ;quantidade de nomes a checar
 
-    MOV DH, 10      ;checar 10 primeiros caracteres
+    MOV DH, NAME_LENGTH      ;checar todos caracteres
     XOR DL, DL      ;contador linha notas
 
     XOR SI, SI      ;linha na matriz dos nomes
@@ -379,7 +458,7 @@ checar_nomes_loop:
     ADD SI, BX      ;prox nome
 
     XOR BX, BX
-    MOV DH, 10       ;contador de caracteres iguais
+    MOV DH, NAME_LENGTH       ;contador de caracteres iguais
     LOOP checar_nomes_loop
 
 ;nome nao existe
@@ -387,14 +466,15 @@ checar_nomes_loop:
     MOV AH, 09h
     MOV DX, OFFSET nome_nao_existe
     INT 21h
-    JMP sair_mudar_dados
+    new_line
+    JMP  pedir_input
 
 caracter_igual:         ;+1 caracter igual
     INC BX              ;prox caracter
     DEC DH              ;contador = 0?
     JNZ checar_nomes_loop
 
-    PUSH DX
+    PUSH DX             ;push linha matriz de notas
     new_line
     MOV AH, 09h
     MOV DX, OFFSET confirmar_nome
@@ -444,7 +524,8 @@ alterar_p1:
     MOV DL, AL
     INT 21h
     new_line
-
+    MOV DL, ' '
+    INT 21h
     CALL le_decimal
     POP SI              ;contador linha notas
     MOV BX, 0
@@ -462,6 +543,8 @@ alterar_p2:
     MOV DL, AL
     INT 21h
     new_line
+    MOV DL, ' '
+    INT 21h
 
     CALL le_decimal
     POP SI              ;contador linha notas
@@ -480,6 +563,8 @@ alterar_p3:
     MOV DL, AL
     INT 21h
     new_line
+    MOV DL, ' '
+    INT 21h
 
     CALL le_decimal
     POP SI              ;contador linha notas
@@ -510,6 +595,27 @@ sair_alteracao:
     RET
 ENDP
 
+inserir_pesos PROC  ;inserir o peso das 3 provas
+    PUSH AX
+
+    XOR SI, SI
+    MOV DX, OFFSET pede_pesos
+    MOV CX, 3
+
+le_pesos:
+    MOV AH, 09h
+    INT 21h
+    CALL le_decimal
+    MOV pesos_provas[SI], AL
+    ADD DX, 22
+    new_line
+    INC SI
+    LOOP le_pesos
+
+    POP AX
+    RET
+ENDP
+
 calcula_media PROC  ;calcula media dos alunos para função print_tabela
     PUSH AX
 
@@ -518,27 +624,42 @@ calcula_media PROC  ;calcula media dos alunos para função print_tabela
 
     MOV CL, cadastros   ;contador quantidade de cadastros
     MOV CH, 3   ;contador de notas p/ aluno
-    XOR AX, AX
+    XOR DX, DX
+
 soma_media:
-    MOV AH, notas[SI][BX]
-    ADD AL, AH  ;soma
+    MOV AL, notas[SI][BX]
+    MOV AH, pesos_provas[BX]
+    MUL AH
+    ADD DL, AL  ;soma
     INC BX      ;prox coluna
     DEC CH
     JNZ soma_media
 
-    XOR AH, AH 
-    PUSH AX     ;salva soma das notas (invertida)
+
+    PUSH DX     ;salva soma das notas (invertida)
     ADD SI, 3   ;prox linha
     XOR BX, BX  ;coluna 0
     MOV CH, 3   ;contador de notas p/ aluno
-    XOR AX, AX
+    XOR DX, DX
     DEC CL      ;-1 aluno
     JNZ soma_media
+
+
+    MOV CX, 3
+    XOR AX, AX
+    XOR BX, BX
+soma_pesos:
+    MOV AH, pesos_provas[BX]
+    ADD AL, AH
+    INC BX
+    LOOP soma_pesos
+    XOR BX, BX
+    MOV BL, AL
 
     XOR CX, CX
     MOV CL, cadastros
     MOV SI, CX
-    MOV BX, 3
+
 
 divide_media:
     XOR DX, DX
@@ -565,14 +686,44 @@ le_numero:
     PUSH AX         ;salva na pilha a soma (0 no primeiro numero)
     MOV AH, 01h
     INT 21h         ;le caracter
+
     CMP AL, 13
     JE sai_le_decimal
+    CMP AL, 8
+    JNE n_backspace_dec
+    
+;nao permite apagar o que voce nao digitou
+    OR BH, BH
+    JNZ backspace_dec
 
+    MOV AH, 02h
+    MOV DL, ' '
+    INT 21h
+    POP AX
+    XOR AX, AX
+    JMP le_numero
+
+backspace_dec:
+    MOV AH, 02h
+    MOV DL, ?
+    INT 21h
+    MOV DL, 8
+    INT 21h
+    XOR DX, DX
+    DEC BH          ;contador 'backspace'
+    POP AX
+    SUB AX, CX
+    DIV BL
+    JMP le_numero
+
+n_backspace_dec:
+    XOR DX, DX
     AND AL, 0Fh     ;transforma em numero
     MOV CL, AL      ;guarda numero temporariamente
     POP AX          ;pega resultado da soma anterior (ou 0)
-    MUL BX
+    MUL BL
     ADD AX, CX      ;soma em AX
+    INC BH          ;contador 'backspace'
     JMP le_numero
 
 sai_le_decimal:
@@ -612,4 +763,5 @@ desempilha_dec:
     POP BX
     RET
 ENDP
+
 END MAIN
