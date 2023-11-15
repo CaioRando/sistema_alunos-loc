@@ -96,12 +96,20 @@ ENDM
                     DB  'Digite o peso da P2: $'        ;22 caracteres
                     DB  'Digite o peso da P3: $'        ;22 caracteres 
 
+    cadastros       DB  0                               ;qnt de alunos cadastrados
+
+    pesos_provas    DB  3 DUP (1)                       ;peso de cada prova (1 como padrao)
+    pede_pesos      DB  'Digite o peso da P1: $'        ;22 caracteres
+                    DB  'Digite o peso da P2: $'        ;22 caracteres
+                    DB  'Digite o peso da P3: $'        ;22 caracteres 
+
     header_tabela   DB  'NOMES', 4 DUP (9), 'P1', 9, 'P2', 9, 'P3', 4 DUP (' '), 'MEDIAS', 10, 13, '$'
     separa_tabela   DB  69 DUP ('-'), '$'
 
     menu_geral      DB  '1. Ver tabela', 10, 13
                     DB  '2. Inserir aluno', 10, 13
                     DB  '3. Corrigir notas', 10, 13
+                    DB  '4. Definir peso', 10, 13
                     DB  '4. Definir peso', 10, 13
                     DB  '0. Sair', 10, 13, '$'
 
@@ -643,6 +651,18 @@ soma_media:
     XOR DX, DX
     DEC CL      ;-1 aluno
     JNZ soma_media
+
+
+    MOV CX, 3
+    XOR AX, AX
+    XOR BX, BX
+soma_pesos:
+    MOV AH, pesos_provas[BX]
+    ADD AL, AH
+    INC BX
+    LOOP soma_pesos
+    XOR BX, BX
+    MOV BL, AL
 
 
     MOV CX, 3
