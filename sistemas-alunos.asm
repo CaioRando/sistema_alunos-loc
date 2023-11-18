@@ -53,7 +53,7 @@ ENDM
 limpa_tela MACRO
     PUSH AX
 
-    MOV AX, 03h
+    MOV AX, 03h     ;modo de video
     INT 10h
 
     XOR AX, AX      ;AL - Numero de linhas de Scroll -> 0 = Toda Tela
@@ -68,7 +68,7 @@ limpa_tela MACRO
     MOV AH, 02h
     INT 10h
 
-    MOV AX, 03h
+    MOV AX, 03h     ;modo de texto
     INT 10h
 
     POP AX
@@ -137,7 +137,6 @@ ENDM
 main PROC
     MOV AX, @DATA
     MOV DS, AX
-
 
     MOV AH, 08h
 menu:
